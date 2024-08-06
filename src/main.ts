@@ -103,46 +103,70 @@ export default class BetterExportPdfPlugin extends Plugin {
     this.addSettingTab(new ConfigSettingTab(this.app, this));
   }
 
-  registerEvents() {
-    // Register the Export As HTML button in the file menu
-    this.registerEvent(
-      this.app.workspace.on("file-menu", (menu, file: TFile | TFolder) => {
-        let title = file instanceof TFolder ? "Export folder to PDF" : "Better Export PDF";
-        if (isDev) {
-          title = `${title} (dev)`;
-        }
+	registerEvents() {
+	    // Register the Export As HTML button in the file menu
+	    this.registerEvent(
+	        this.app.workspace.on("file-menu", (menu, file: TFile | TFolder) => {
+	            let title = file instanceof TFolder ? "Export folder to PDF" : "Better Export PDF";
+	            if (isDev) {
+	                title = `${title} (dev)`;
+	            }
+	
+	            menu.addItem((item) => {
+	                item
+	                    .setTitle(title)
+	                    .setIcon("download")
+	                    .setSection("action")
+	                    .onClick(async () => {
+	                        new ExportConfigModal(this, file).open();
+	                    });
+	            });
+	        }),
+	    );
+	
+	    // Register the Export Each File in Folder to PDF button in the file menu
+	    this.registerEvent(
+	        this.app.workspace.on("file-menu", (menu, file: TFile | TFolder) => {
+	            if (file instanceof TFolder) {
+	                let title = "Export each file to PDF";
+	                if (isDev) {
+	                    title = `${title} (dev)`;
+	                }
+	                menu.addItem((item) => {
+	                    item
+	                        .setTitle(title)
+	                        .setIcon("download")
+	                        .setSection("action")
+	                        .onClick(async () => {
+	                            await this.exportFolderInOrder(file);
+	                        });
+	                });
+	            }
+	        }),
+	    );
+	}
+	
+	async exportFolderInOrder(folder: TFolder) {
+	    const files = folder.children
+	        .filter(child => child instanceof TFile)
+	        .sort((a, b) => a.name.localeCompare(b.name));
+	    const subfolders = folder.children
+	        .filter(child => child instanceof TFolder)
+	        .sort((a, b) => a.name.localeCompare(b.name));
+	
+	    for (const file of files) {
+	        await this.exportFile(file);
+	    }
+	
+	    for (const subfolder of subfolders) {
+	        await this.exportFolderInOrder(subfolder as TFolder);
+	    }
+	}
+	
+	async exportFile(file: TFile) {
+	    new ExportConfigModal(this, file).open();
+	}
 
-        menu.addItem((item) => {
-          item
-            .setTitle(title)
-            .setIcon("download")
-            .setSection("action")
-            .onClick(async () => {
-              new ExportConfigModal(this, file).open();
-            });
-        });
-      }),
-    );
-    this.registerEvent(
-      this.app.workspace.on("file-menu", (menu, file: TFile | TFolder) => {
-        if (file instanceof TFolder) {
-          let title = "Export each file to PDF";
-          if (isDev) {
-            title = `${title} (dev)`;
-          }
-          menu.addItem((item) => {
-            item
-              .setTitle(title)
-              .setIcon("download")
-              .setSection("action")
-              .onClick(async () => {
-                new ExportConfigModal(this, file, true).open();
-              });
-          });
-        }
-      }),
-    );
-  }
   onunload() {}
   async loadSettings() {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
